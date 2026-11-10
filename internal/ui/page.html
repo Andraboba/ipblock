@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ipblock</title>
+<style>
+:root {
+  --bg: #f4f5f7; --card: #ffffff; --text: #1c2025; --muted: #667080; --line: #dfe3e8;
+  --accent: #2563eb; --accent-text: #ffffff; --hover: #eef2f7;
+  --ok: #1a7f37; --ok-bg: #dcf5e3; --bad: #c1272d; --bad-bg: #fde3e4;
+  --warn: #9a6200; --warn-bg: #fdf0d2; --off: #5c6672; --off-bg: #e6e9ed;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15181c; --card: #1e2227; --text: #e6e9ed; --muted: #98a2b0; --line: #333a43;
+    --accent: #5b8def; --accent-text: #0e1116; --hover: #272c33;
+    --ok: #6fd58a; --ok-bg: #173522; --bad: #ff8a8f; --bad-bg: #44191c;
+    --warn: #f0c060; --warn-bg: #3d2f10; --off: #a9b2bd; --off-bg: #2c323a;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 980px; margin: 0 auto; padding: 20px 16px 48px; }
+header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+h1 { font-size: 20px; margin: 0; }
+h2 { font-size: 16px; margin: 0 0 4px; }
+.spacer { flex: 1; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.pill.ok { color: var(--ok); background: var(--ok-bg); }
+.pill.bad { color: var(--bad); background: var(--bad-bg); }
+.pill.warn { color: var(--warn); background: var(--warn-bg); }
+.pill.off { color: var(--off); background: var(--off-bg); }
+.note { border-radius: 8px; padding: 8px 12px; margin: 8px 0 0; font-size: 14px; }
+.note.warn { color: var(--warn); background: var(--warn-bg); }
+.note.bad { color: var(--bad); background: var(--bad-bg); }
+.note.ok { color: var(--ok); background: var(--ok-bg); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { border: 1px solid var(--line); background: var(--card); border-radius: 7px; padding: 6px 12px; cursor: pointer; }
+button:hover { background: var(--hover); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+button.primary:hover { filter: brightness(1.08); }
+button:disabled { opacity: .5; cursor: default; }
+input[type=text], select, textarea { border: 1px solid var(--line); background: var(--bg); border-radius: 7px; padding: 6px 10px; width: 100%; }
+textarea { min-height: 64px; resize: vertical; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); }
+td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+.mono { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+.wrap { overflow-wrap: anywhere; }
+.scroll { max-height: 340px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; margin-top: 10px; }
+.proc { display: flex; gap: 10px; align-items: baseline; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 8px 12px; }
+.proc:last-child { border-bottom: 0; }
+.proc .name { font-weight: 600; white-space: nowrap; }
+.proc .path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+@media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+label.check { display: flex; gap: 8px; align-items: flex-start; margin-top: 8px; }
+label.check input { margin-top: 3px; }
+.field { margin-top: 10px; }
+.field > span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.approw { display: grid; grid-template-columns: 1fr 1fr 220px auto; gap: 8px; margin-top: 6px; align-items: center; }
+@media (max-width: 720px) { .approw { grid-template-columns: 1fr; } }
+td.actions { white-space: nowrap; text-align: right; }
+td.actions button { padding: 3px 9px; font-size: 13px; margin-left: 4px; }
+.hidden { display: none !important; }
+.tablewrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>ipblock</h1>
+    <span id="svc" class="pill off">загрузка…</span>
+    <span id="pubip" class="muted small"></span>
+    <span class="spacer"></span>
+    <button id="quit" title="Остановить панель. Сервис блокировки продолжит работать">Закрыть панель</button>
+  </header>
+
+  <div id="alerts"></div>
+
+  <section class="card">
+    <div class="row">
+      <h2>Правила</h2>
+      <span class="spacer"></span>
+      <button id="addrule">Добавить правило</button>
+    </div>
+    <div class="muted small" id="cfgpath"></div>
+    <div class="tablewrap">
+      <table id="rules">
+        <thead><tr><th>Правило</th><th>Сейчас</th><th>Разрешено с адресов</th><th>Что закрыто</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="r-result"></div>
+
+    <div id="editor" class="hidden">
+      <h2 id="e-title" style="margin-top:18px"></h2>
+      <div class="grid">
+        <div>
+          <div class="field"><span>Название</span>
+            <input type="text" id="e-name" placeholder="например: рабочая почта" autocomplete="off">
+          </div>
+          <div class="field"><span>Какой IP сравнивать</span>
+            <select id="e-source">
+              <option value="public">Внешний — под которым вас видит интернет</option>
+              <option value="local">Локальный — адрес сетевой карты, Wi-Fi или VPN-адаптера</option>
+              <option value="any">Любой из них</option>
+            </select>
+          </div>
+          <div class="field"><span>Доступ разрешён с адресов (по одному в строке: IP, подсеть, диапазон или шаблон 10.1.*.*)</span>
+            <textarea id="e-allow" placeholder="203.0.113.0/24" spellcheck="false"></textarea>
+            <button id="e-usemine" class="small" style="margin-top:6px">Подставить мой текущий внешний IP</button>
+          </div>
+        </div>
+        <div>
+          <div class="field"><span>Сайты (по одному в строке; каждый поддомен отдельно)</span>
+            <textarea id="e-domains" placeholder="mail.example.com" spellcheck="false"></textarea>
+          </div>
+          <label class="check"><input type="checkbox" id="e-resolve">
+            <span>Запоминать IP этих сайтов и закрывать их в файрволе<br>
+              <span class="muted small">Надёжнее одного hosts, но может задеть чужие сайты на тех же адресах.</span></span></label>
+          <div class="field"><span>Адреса и подсети серверов (по одному в строке) — самая надёжная защита</span>
+            <textarea id="e-ips" placeholder="192.0.2.0/24" spellcheck="false"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="field"><span>Программы (в Windows можно указать папку — закроются все .exe в ней)</span>
+        <div id="e-apps"></div>
+        <button id="e-addapp" class="small" style="margin-top:6px">Добавить программу</button>
+      </div>
+      <details style="margin-top:10px">
+        <summary class="muted small" style="cursor:pointer">Если VPN ведёт разные сайты через разные серверы</summary>
+        <div class="field"><span>Сервисы проверки внешнего IP для этого правила (по одному адресу в строке; пусто — общий список).
+          Укажите сервис, который идёт тем же путём, что и защищаемый сайт: какой сервис какой адрес видит, показано вверху страницы.</span>
+          <textarea id="e-services" placeholder="https://icanhazip.com" spellcheck="false"></textarea>
+        </div>
+      </details>
+      <div class="row" style="margin-top:14px">
+        <button class="primary" id="e-save">Сохранить правило</button>
+        <button id="e-cancel">Отмена</button>
+      </div>
+      <div id="e-result"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Общие настройки</h2>
+    <div class="grid">
+      <div class="field"><span>Как часто перепроверять IP (например 20s, 1m; не меньше 5s)</span>
+        <input type="text" id="s-interval" placeholder="20s" autocomplete="off">
+      </div>
+      <div class="field"><span>Когда сервис останавливается</span>
+        <select id="s-onstop">
+          <option value="">Закрыть доступ полностью (по умолчанию)</option>
+          <option value="lock">Закрыть доступ полностью</option>
+          <option value="clear">Снять все блокировки</option>
+        </select>
+      </div>
+    </div>
+    <details style="margin-top:10px">
+      <summary class="muted small" style="cursor:pointer">Дополнительно</summary>
+      <div class="grid">
+        <div class="field"><span>Файл журнала (пусто — ipblock.log рядом с настройками)</span>
+          <input type="text" id="s-log" autocomplete="off">
+        </div>
+        <div class="field"><span>Сервисы определения внешнего IP (по одному адресу в строке; пусто — встроенный список)</span>
+          <textarea id="s-services" placeholder="https://api.ipify.org" spellcheck="false"></textarea>
+        </div>
+      </div>
+    </details>
+    <div class="row" style="margin-top:14px">
+      <button class="primary" id="s-save">Сохранить настройки</button>
+    </div>
+    <div id="s-result"></div>
+  </section>
+
+  <section class="card">
+    <h2>Найти адреса программы</h2>
+    <div class="muted small">Выберите программу — панель покажет, к каким адресам она обращается, и добавит их в правило.</div>
+
+    <div id="pick">
+      <div class="row" style="margin-top:12px">
+        <input type="text" id="filter" placeholder="Поиск по названию или пути" style="flex:1; min-width:200px" autocomplete="off">
+        <button id="refresh">Обновить список</button>
+      </div>
+      <div class="scroll" id="proclist"></div>
+      <div class="muted small" id="proccount" style="margin-top:6px"></div>
+    </div>
+
+    <div id="watch" class="hidden">
+      <div class="row" style="margin-top:12px">
+        <strong id="wname"></strong>
+        <span id="wstate" class="pill ok"></span>
+        <span class="spacer"></span>
+        <button id="wstop">Остановить</button>
+        <button id="wback">Другая программа</button>
+      </div>
+      <div class="muted small wrap" id="wpath"></div>
+      <div class="note warn" id="whint">Поработайте в программе как обычно: откройте почту, отправьте письмо, зайдите в нужные разделы.
+        Адреса появляются здесь по мере того, как программа к ним обращается. Наблюдайте, пока доступ открыт:
+        закрытая программа ни с кем не соединяется.</div>
+      <div id="werr"></div>
+
+      <div class="tablewrap" style="margin-top:10px">
+        <table id="found">
+          <thead><tr>
+            <th style="width:28px"><input type="checkbox" id="all" checked title="Отметить все"></th>
+            <th>Адрес</th><th>Порты</th><th>Имя сайта</th><th>Соединений</th><th>Замечен</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="muted small" id="wempty">Пока ни одного адреса.</div>
+
+      <div class="grid">
+        <div>
+          <div class="field"><span>Добавить в правило</span>
+            <select id="rule"></select>
+          </div>
+          <div id="newrule" class="hidden">
+            <div class="field"><span>Название нового правила</span>
+              <input type="text" id="newname" placeholder="например: рабочая почта" autocomplete="off">
+            </div>
+            <div class="field"><span>С каких адресов доступ разрешён (по одному в строке: IP, подсеть, диапазон или шаблон)</span>
+              <textarea id="allow" placeholder="203.0.113.0/24" spellcheck="false"></textarea>
+              <button id="usemine" class="small" style="margin-top:6px">Подставить мой текущий внешний IP</button>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label class="check"><input type="checkbox" id="addapp" checked>
+            <span>Закрыть и саму программу<br><span class="muted small" id="apphint"></span></span></label>
+          <label class="check"><input type="checkbox" id="subnets">
+            <span>Добавлять подсетями (/24)<br><span class="muted small">Серверы одного сервиса обычно стоят рядом. Надёжнее, но может задеть соседние сайты.</span></span></label>
+          <div class="row" style="margin-top:14px">
+            <button class="primary" id="add">Добавить в настройки</button>
+            <span class="muted small" id="selcount"></span>
+          </div>
+        </div>
+      </div>
+      <div id="result"></div>
+    </div>
+  </section>
+
+  <div class="muted small">Видны TCP-соединения. Адреса, к которым программа обращается только по UDP, в список не попадают;
+    обычно это те же серверы.</div>
+</main>
+
+<script>
+"use strict";
+const TOKEN = "{{TOKEN}}";
+const $ = id => document.getElementById(id);
+
+// el создаёт элемент; текст всегда вставляется как текст, не как разметка.
+function el(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (k === "class") e.className = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) e.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids.flat()) if (kid != null) e.append(kid);
+  return e;
+}
+
+async function api(path, body) {
+  const r = await fetch("/api/" + path, {
+    method: body === undefined ? "GET" : "POST",
+    headers: { "X-Ipblock-Token": TOKEN, "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || ("Ошибка " + r.status));
+  return data;
+}
+
+let state = null;        // ответ /api/state
+let procs = [];          // ответ /api/processes
+let watching = null;     // ответ /api/watch
+const unchecked = new Set();
+let gone = false;        // панель остановлена
+
+function plural(n, one, few, many) {
+  const a = n % 10, b = n % 100;
+  if (a === 1 && b !== 11) return one;
+  if (a >= 2 && a <= 4 && (b < 10 || b >= 20)) return few;
+  return many;
+}
+
+// ---------- состояние и правила ----------
+
+function renderState() {
+  const s = state;
+  const svc = $("svc");
+  const total = s.rules.length, open = s.rules.filter(r => r.known && r.allowed).length;
+  if (s.service !== "ok") {
+    svc.className = "pill off";
+    svc.textContent = s.service === "stale" ? "сервис не отвечает" : "сервис не запущен";
+  } else if (s.warnings.length) {
+    svc.className = "pill warn"; svc.textContent = "есть проблема";
+  } else if (s.rules.some(r => !r.known)) {
+    // Правило только что добавили или переименовали: сервис ещё не вынес по нему решение.
+    svc.className = "pill off"; svc.textContent = "ждёт проверки сервиса";
+  } else if (total && open === total) {
+    svc.className = "pill ok"; svc.textContent = "доступ открыт";
+  } else if (open === 0) {
+    svc.className = "pill bad"; svc.textContent = "доступ закрыт";
+  } else {
+    svc.className = "pill warn"; svc.textContent = "открыто " + open + " из " + total;
+  }
+  $("pubip").textContent = s.public_ips.length ? "Внешний IP: " + s.public_ips.join(", ")
+    : (s.public_error ? "Внешний IP не определяется" : "");
+  $("cfgpath").textContent = "Файл настроек: " + s.config_path;
+
+  const alerts = $("alerts");
+  alerts.replaceChildren();
+  if (s.config_error) alerts.append(el("div", { class: "note bad" }, "Ошибка в настройках: " + s.config_error));
+  for (const w of s.warnings) alerts.append(el("div", { class: "note warn" }, w));
+  if (s.seen_as.length > 1) alerts.append(el("div", { class: "note warn" },
+    "Сервисы проверки видят разные внешние IP: " + s.seen_as.map(a => a.ip + " (" + a.services.join(", ") + ")").join("; ") +
+    ". Так бывает, когда VPN ведёт трафик к разным сайтам через разные серверы. Правило открывается, только если разрешены все эти адреса. " +
+    "Иначе откройте правило и в разделе «Если VPN ведёт разные сайты через разные серверы» укажите сервис, который идёт тем же путём, что и защищаемый сайт."));
+  if (!s.can_write) alerts.append(el("div", { class: "note warn" },
+    s.os === "windows"
+      ? "Панель запущена без прав администратора: смотреть можно, сохранять в настройки — нет. Запустите «ipblock ui» из терминала администратора."
+      : "Нет прав на запись файла настроек: смотреть можно, сохранять — нет."));
+  if (alerts.children.length) alerts.style.marginBottom = "16px"; else alerts.style.marginBottom = "0";
+
+  const body = $("rules").tBodies[0];
+  body.replaceChildren();
+  for (const r of s.rules) {
+    const what = [];
+    if (r.domains.length) what.push(r.domains.length + " " + plural(r.domains.length, "сайт", "сайта", "сайтов"));
+    if (r.ips.length) what.push(r.ips.length + " " + plural(r.ips.length, "адрес", "адреса", "адресов"));
+    if (r.apps.length) what.push(r.apps.length + " " + plural(r.apps.length, "программа", "программы", "программ"));
+    const pill = !r.known ? el("span", { class: "pill off" }, "нет данных")
+      : r.allowed ? el("span", { class: "pill ok" }, "открыто") : el("span", { class: "pill bad" }, "закрыто");
+    const i = body.rows.length;
+    body.append(el("tr", {},
+      el("td", {}, el("strong", {}, r.name), r.note ? el("div", { class: "muted small" }, r.note) : null),
+      el("td", {}, pill),
+      el("td", { class: "mono wrap" }, r.allow_from.join(", ") || "—"),
+      el("td", { title: [...r.domains, ...r.ips, ...r.apps].join("\n") }, what.join(", ") || "—"),
+      el("td", { class: "actions" },
+        el("button", { disabled: !s.can_write, onclick: () => openEditor(i) }, "Изменить"),
+        el("button", { disabled: !s.can_write, onclick: () => deleteRule(i) }, "Удалить"))));
+  }
+  if (!s.rules.length)
+    body.append(el("tr", {}, el("td", { colspan: 5, class: "muted" },
+      s.missing ? "Файла настроек ещё нет. Добавьте первое правило — файл будет создан."
+        : s.config ? "Правил пока нет. Добавьте первое." : "Файл настроек не удалось прочитать.")));
+  $("addrule").disabled = !s.can_write || !s.config;
+  $("s-save").disabled = !s.can_write || !s.config;
+  fillSettings();
+
+  // Список правил в форме добавления: сохраняем выбор пользователя.
+  const sel = $("rule"), keep = sel.value;
+  sel.replaceChildren(...s.rules.map(r => el("option", { value: "r:" + r.name }, r.name)),
+    el("option", { value: "new" }, "Новое правило…"));
+  if ([...sel.options].some(o => o.value === keep)) sel.value = keep;
+  toggleNewRule();
+}
+
+async function loadState() {
+  if (gone) return;
+  try { state = await api("state"); renderState(); } catch (e) { /* панель могла закрыться */ }
+}
+
+// ---------- редактор правил и общих настроек ----------
+
+const lines = text => text.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+const note = (box, cls, text) => box.replaceChildren(el("div", { class: "note " + cls }, text));
+let editPos = null;          // номер редактируемого правила в списке; -1 — новое; null — редактор закрыт
+let settingsDirty = false;   // пользователь начал править общие настройки — не перезаписываем поля
+
+// saveConfig отправляет настройки целиком. Сервер проверяет их так же, как сервис при чтении файла.
+async function saveConfig(cfg) {
+  await api("config", { version: state.version, config: cfg });
+  await loadState();
+}
+
+function appRow(a) {
+  const row = el("div", { class: "approw" },
+    el("input", { type: "text", "data-k": "windows", placeholder: "Windows: C:\\Program Files\\…\\app.exe", value: a.windows || "", autocomplete: "off", "aria-label": "Путь в Windows" }),
+    el("input", { type: "text", "data-k": "darwin", placeholder: "macOS: /Applications/App.app", value: a.darwin || "", autocomplete: "off", "aria-label": "Путь в macOS" }),
+    el("select", { "data-k": "action", "aria-label": "Что делать с программой" },
+      el("option", { value: "" }, "как обычно для системы"),
+      el("option", { value: "network" }, "закрыть сеть"),
+      el("option", { value: "kill" }, "закрыть сеть и программу")),
+    el("button", { onclick: () => row.remove(), title: "Убрать программу из правила" }, "Убрать"));
+  row.querySelector("select").value = a.action || "";
+  return row;
+}
+
+function openEditor(pos) {
+  const r = pos >= 0 ? state.config.rules[pos]
+    : { index: -1, name: "", ip_source: "public", allow_from: [], domains: [], resolve_domains: true, ips: [], apps: [], ip_services: [] };
+  editPos = pos;
+  $("e-title").textContent = pos >= 0 ? "Правило «" + (r.name || state.rules[pos].name) + "»" : "Новое правило";
+  $("e-name").value = r.name;
+  $("e-source").value = r.ip_source || "public";
+  $("e-allow").value = r.allow_from.join("\n");
+  $("e-domains").value = r.domains.join("\n");
+  $("e-resolve").checked = r.resolve_domains;
+  $("e-ips").value = r.ips.join("\n");
+  $("e-apps").replaceChildren(...r.apps.map(appRow));
+  $("e-services").value = r.ip_services.join("\n");
+  $("e-services").closest("details").open = r.ip_services.length > 0;
+  $("e-result").replaceChildren();
+  $("editor").classList.remove("hidden");
+  $("editor").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  $("e-name").focus();
+}
+
+function closeEditor() { editPos = null; $("editor").classList.add("hidden"); }
+
+function readEditor() {
+  const apps = [...$("e-apps").children].map(row => {
+    const a = {};
+    for (const f of row.querySelectorAll("[data-k]")) a[f.dataset.k] = f.value.trim();
+    return a;
+  }).filter(a => a.windows || a.darwin);
+  return {
+    index: editPos >= 0 ? state.config.rules[editPos].index : -1,
+    name: $("e-name").value.trim(),
+    ip_source: $("e-source").value,
+    allow_from: lines($("e-allow").value),
+    domains: lines($("e-domains").value),
+    resolve_domains: $("e-resolve").checked,
+    ips: lines($("e-ips").value),
+    apps,
+    ip_services: lines($("e-services").value),
+  };
+}
+
+async function saveRule() {
+  const cfg = structuredClone(state.config), rule = readEditor(), isNew = editPos < 0;
+  if (isNew) cfg.rules.push(rule); else cfg.rules[editPos] = rule;
+  $("e-save").disabled = true;
+  try {
+    await saveConfig(cfg);
+    closeEditor();
+    note($("r-result"), "ok", "Правило «" + (rule.name || "без названия") + "» сохранено. Сервис применит изменения при следующей проверке.");
+  } catch (e) { note($("e-result"), "bad", e.message); }
+  $("e-save").disabled = false;
+}
+
+async function deleteRule(pos) {
+  const name = state.rules[pos].name;
+  if (!confirm("Удалить правило «" + name + "»? Всё, что оно закрывало, станет доступно с любого адреса.")) return;
+  const cfg = structuredClone(state.config);
+  cfg.rules.splice(pos, 1);
+  try {
+    await saveConfig(cfg);
+    closeEditor();
+    note($("r-result"), "ok", "Правило «" + name + "» удалено.");
+  } catch (e) { note($("r-result"), "bad", e.message); }
+}
+
+function fillSettings() {
+  if (settingsDirty || !state.config) return;
+  const c = state.config;
+  $("s-interval").value = c.check_interval;
+  $("s-onstop").value = c.on_stop === "keep" ? "lock" : c.on_stop;
+  $("s-log").value = c.log_file;
+  $("s-services").value = c.public_ip_services.join("\n");
+}
+
+async function saveSettings() {
+  const cfg = structuredClone(state.config);
+  cfg.check_interval = $("s-interval").value.trim();
+  cfg.on_stop = $("s-onstop").value;
+  cfg.log_file = $("s-log").value.trim();
+  cfg.public_ip_services = lines($("s-services").value);
+  $("s-save").disabled = true;
+  try {
+    settingsDirty = false;
+    await saveConfig(cfg);
+    note($("s-result"), "ok", "Настройки сохранены. Сервис применит их при следующей проверке.");
+  } catch (e) { settingsDirty = true; note($("s-result"), "bad", e.message); }
+  $("s-save").disabled = false;
+}
+
+function myIP(textarea) {
+  if (!state || !state.public_ips.length) { alert("Внешний IP сейчас неизвестен: сервис не запущен или не смог его определить."); return; }
+  const cur = textarea.value.trim();
+  textarea.value = (cur ? cur + "\n" : "") + state.public_ips.join("\n");
+}
+
+// ---------- выбор программы ----------
+
+function renderProcs() {
+  const q = $("filter").value.trim().toLowerCase();
+  const list = procs.filter(p => !q || p.name.toLowerCase().includes(q) || p.path.toLowerCase().includes(q));
+  const box = $("proclist");
+  box.replaceChildren(...list.slice(0, 300).map(p => el("button", { class: "proc", onclick: () => startWatch(p) },
+    el("span", { class: "name" }, p.name),
+    el("span", { class: "path muted small", title: p.path }, p.path || "путь неизвестен"),
+    el("span", { class: "muted small" }, p.conns
+      ? p.conns + " " + plural(p.conns, "соединение", "соединения", "соединений") : "нет соединений"))));
+  if (!list.length) box.append(el("div", { class: "muted", style: "padding:12px" }, "Ничего не найдено."));
+  const active = procs.filter(p => p.conns).length;
+  $("proccount").textContent = "Программ: " + procs.length + ", из них сейчас соединены с сетью: " + active +
+    ". Сверху те, у кого соединений больше.";
+}
+
+async function loadProcs() {
+  $("refresh").disabled = true;
+  try { procs = await api("processes"); renderProcs(); }
+  catch (e) { $("proclist").replaceChildren(el("div", { class: "note bad" }, e.message)); }
+  $("refresh").disabled = false;
+}
+
+// ---------- наблюдение ----------
+
+async function startWatch(p) {
+  unchecked.clear();
+  $("result").replaceChildren();
+  try {
+    watching = await api("watch", { key: p.key, name: p.name, path: p.path });
+    $("pick").classList.add("hidden");
+    $("watch").classList.remove("hidden");
+    renderWatch();
+  } catch (e) { alert(e.message); }
+}
+
+function ago(sec) {
+  if (sec < 3) return "только что";
+  if (sec < 60) return sec + " с назад";
+  return Math.floor(sec / 60) + " мин назад";
+}
+
+function renderWatch() {
+  const w = watching;
+  $("wname").textContent = w.name;
+  $("wpath").textContent = w.path;
+  const st = $("wstate");
+  const mm = String(Math.floor(w.seconds / 60)).padStart(2, "0"), ss = String(w.seconds % 60).padStart(2, "0");
+  if (w.active) {
+    st.className = "pill ok";
+    st.textContent = "наблюдаю " + mm + ":" + ss + (w.procs ? "" : " — программа не запущена");
+  } else {
+    st.className = "pill off"; st.textContent = "остановлено";
+  }
+  $("wstop").disabled = !w.active;
+  $("whint").classList.toggle("hidden", !w.active);
+  $("werr").replaceChildren(w.error ? el("div", { class: "note bad" }, w.error) : "");
+
+  const body = $("found").tBodies[0];
+  body.replaceChildren(...w.items.map(it => el("tr", {},
+    el("td", {}, el("input", { type: "checkbox", checked: !unchecked.has(it.ip), "aria-label": "Добавить " + it.ip,
+      onchange: ev => { ev.target.checked ? unchecked.delete(it.ip) : unchecked.add(it.ip); updateCount(); } })),
+    el("td", { class: "mono" }, it.ip),
+    el("td", { class: "mono" }, it.ports.join(", ")),
+    el("td", { class: "wrap" }, it.name || el("span", { class: "muted" }, "—")),
+    el("td", {}, String(it.conns)),
+    el("td", { class: "muted small" }, ago(it.ago_sec)))));
+  $("wempty").classList.toggle("hidden", w.items.length > 0);
+  $("apphint").textContent = w.path || "путь к программе неизвестен";
+  if (!w.path) { $("addapp").checked = false; $("addapp").disabled = true; } else $("addapp").disabled = false;
+  updateCount();
+}
+
+function selected() { return watching ? watching.items.map(i => i.ip).filter(ip => !unchecked.has(ip)) : []; }
+
+function updateCount() {
+  const n = selected().length, total = watching ? watching.items.length : 0;
+  $("selcount").textContent = "Отмечено адресов: " + n + " из " + total;
+  $("all").checked = total > 0 && n === total;
+  $("all").indeterminate = n > 0 && n < total;
+}
+
+async function pollWatch() {
+  if (gone || !watching || !watching.active) return;
+  try { watching = await api("watch"); renderWatch(); } catch (e) { /* панель могла закрыться */ }
+}
+
+function toggleNewRule() { $("newrule").classList.toggle("hidden", $("rule").value !== "new"); }
+
+async function add() {
+  const sel = $("rule").value, isNew = sel === "new";
+  const body = {
+    rule: isNew ? "" : sel.slice(2),
+    new_name: isNew ? $("newname").value.trim() : "",
+    allow_from: isNew ? $("allow").value.split(/[\n,]+/).map(s => s.trim()).filter(Boolean) : [],
+    ips: selected(),
+    subnets: $("subnets").checked,
+    app: $("addapp").checked,
+  };
+  const out = $("result");
+  $("add").disabled = true;
+  try {
+    const r = await api("add", body);
+    const parts = [];
+    if (r.ips) parts.push(r.ips + " " + (body.subnets ? plural(r.ips, "подсеть", "подсети", "подсетей")
+      : plural(r.ips, "адрес", "адреса", "адресов")));
+    if (r.app) parts.push("программа");
+    out.replaceChildren(el("div", { class: "note ok" }, "Записано в правило «" + r.rule + "»: " + parts.join(" и ") +
+      ". Сервис применит изменения при следующей проверке, в течение полуминуты."));
+    await loadState();
+    if (isNew) $("rule").value = "r:" + r.rule;
+    toggleNewRule();
+  } catch (e) {
+    out.replaceChildren(el("div", { class: "note bad" }, e.message));
+  }
+  $("add").disabled = false;
+}
+
+// ---------- события ----------
+
+$("filter").addEventListener("input", renderProcs);
+$("refresh").addEventListener("click", loadProcs);
+$("rule").addEventListener("change", toggleNewRule);
+$("add").addEventListener("click", add);
+$("all").addEventListener("change", ev => {
+  unchecked.clear();
+  if (!ev.target.checked && watching) for (const it of watching.items) unchecked.add(it.ip);
+  renderWatch();
+});
+$("wstop").addEventListener("click", async () => {
+  try { watching = await api("watch/stop", {}); renderWatch(); } catch (e) { alert(e.message); }
+});
+$("wback").addEventListener("click", async () => {
+  try { await api("watch/stop", {}); } catch (e) { /* уже остановлено */ }
+  watching = null;
+  $("watch").classList.add("hidden");
+  $("pick").classList.remove("hidden");
+  loadProcs();
+});
+$("usemine").addEventListener("click", () => myIP($("allow")));
+$("e-usemine").addEventListener("click", () => myIP($("e-allow")));
+$("addrule").addEventListener("click", () => openEditor(-1));
+$("e-addapp").addEventListener("click", () => $("e-apps").append(appRow({})));
+$("e-save").addEventListener("click", saveRule);
+$("e-cancel").addEventListener("click", closeEditor);
+$("s-save").addEventListener("click", saveSettings);
+for (const id of ["s-interval", "s-onstop", "s-log", "s-services"])
+  $(id).addEventListener("input", () => { settingsDirty = true; });
+$("quit").addEventListener("click", async () => {
+  if (!confirm("Закрыть панель? Сервис блокировки продолжит работать.")) return;
+  gone = true;
+  try { await api("quit", {}); } catch (e) { /* сервер уже остановился */ }
+  document.querySelector("main").replaceChildren(el("div", { class: "card" },
+    el("h2", {}, "Панель закрыта"), el("div", { class: "muted" }, "Эту вкладку можно закрыть. Сервис блокировки продолжает работать.")));
+});
+
+function ping() { if (!gone) api("ping", {}).catch(() => {}); }
+
+ping();
+loadState();
+loadProcs();
+setInterval(ping, 5000);
+setInterval(loadState, 5000);
+setInterval(pollWatch, 1000);
+</script>
+</body>
+</html>
